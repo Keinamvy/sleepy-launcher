@@ -817,20 +817,17 @@ impl SimpleComponent for App {
                                 Ok(web_cache) => {
                                     let web_cache = String::from_utf8_lossy(&web_cache);
 
-                                    // https://webstatic-sea.[ho-yo-ver-se].com/[ge-nsh-in]/event/e20190909gacha-v2/index.html?......
+                                    // https://public-operation.[ho-yo-ver-se].com/common/gacha_record/getGachaLog?......
                                     if let Some(url) = web_cache
-                                        .lines()
-                                        .rev()
-                                        .find(|line| line.contains("getGachaLog"))
+                                        .split("1/0/")
+                                        .filter(|line| {
+                                            line.starts_with("https://")
+                                                && line.contains("getGachaLog")
+                                        })
+                                        .last()
+                                        .map(|url| url.trim_end_matches('\0'))
                                     {
-                                        let url_begin_pos = url.find("https://").unwrap();
-                                        let url_end_pos = url_begin_pos
-                                            + url[url_begin_pos..].find("\0\0\0\0").unwrap();
-
-                                        if let Err(err) = open::that(format!(
-                                            "{}#/log",
-                                            &url[url_begin_pos..url_end_pos]
-                                        )) {
+                                        if let Err(err) = open::that(url) {
                                             tracing::error!(
                                                 "Failed to open Signal Search URL: {err}"
                                             );
