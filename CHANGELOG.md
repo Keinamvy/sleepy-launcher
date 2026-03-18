@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed a panic when the launcher folder is a broken symlink, the launcher will exit with an
   error message instead
+- Fixed search url extractor
 
 ## [1.6.2] - 2026-01-03
 
