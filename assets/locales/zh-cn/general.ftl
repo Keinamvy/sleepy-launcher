@@ -70,3 +70,5 @@ explorer = 资源管理器
 task-manager = 任务管理器
 configuration = Wine 设置
 debugger = 调试器 
+
+remake-prefix = Remake prefix

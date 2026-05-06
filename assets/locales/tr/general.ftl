@@ -70,3 +70,5 @@ explorer = Dosya gezgini
 task-manager = Görev yöneticisi
 configuration = Konfigürasyon
 debugger = Debug aracı
+
+remake-prefix = Remake prefix

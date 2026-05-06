@@ -81,7 +81,6 @@ impl SimpleAsyncComponent for WelcomeApp {
             WelcomeAppMsg::Continue => {
                 let installed =
                     is_available("git") &&
-                    is_available("magick") &&
                     (is_available("7z") || is_available("7za"));
 
                 if installed {

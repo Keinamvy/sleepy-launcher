@@ -13,6 +13,7 @@ mod download_diff;
 mod migrate_folder;
 mod disable_telemetry;
 mod launch;
+mod import_game;
 
 use anime_launcher_sdk::components::loader::ComponentsLoader;
 use anime_launcher_sdk::config::ConfigExt;
@@ -89,12 +90,18 @@ pub enum AppMsg {
 
     OpenPreferences,
     RepairGame,
+    RemakePrefix,
+
+    ImportGame,
+    ImportGameFromPath(std::path::PathBuf),
 
     PredownloadUpdate,
     PerformAction,
 
     HideWindow,
     ShowWindow,
+
+    SuggestTimeoutFix,
 
     Toast {
         title: String,
@@ -604,6 +611,30 @@ impl SimpleComponent for App {
                                     adw::Bin {
                                         set_css_classes: &["background", "round-bin"],
 
+                                        #[watch]
+                                        set_visible: matches!(model.state.as_ref(),
+                                            Some(LauncherState::GameNotInstalled(_))
+                                        ) && !model.kill_game_button,
+
+                                        #[name = "import_game_button"]
+                                        gtk::Button {
+                                            set_width_request: 44,
+                                            set_css_classes: &["circular"],
+                                            set_icon_name: "document-import-symbolic",
+                                            set_tooltip_text: Some(&tr!("import-game")),
+
+                                            #[watch]
+                                            set_sensitive: !model.disabled_buttons,
+
+                                            connect_clicked[sender] => move |_| {
+                                                sender.input(AppMsg::ImportGame);
+                                            }
+                                        }
+                                    },
+
+                                    adw::Bin {
+                                        set_css_classes: &["background", "round-bin"],
+
                                         gtk::Button {
                                             #[watch]
                                             set_sensitive: !model.disabled_buttons,
@@ -675,6 +706,30 @@ impl SimpleComponent for App {
         let toast_overlay = &model.toast_overlay;
 
         let widgets = view_output!();
+
+        // drag-and-drop onto the import button
+        {
+            let drop_target = gtk::DropTarget::new(
+                gtk::gdk::FileList::static_type(),
+                gtk::gdk::DragAction::COPY
+            );
+            drop_target.connect_drop(clone!(
+                #[strong]
+                sender,
+                move |_, value, _, _| {
+                    if let Ok(file_list) = value.get::<gtk::gdk::FileList>() {
+                        if let Some(file) = file_list.files().first() {
+                            if let Some(path) = file.path() {
+                                sender.input(AppMsg::ImportGameFromPath(path));
+                                return true;
+                            }
+                        }
+                    }
+                    false
+                }
+            ));
+            widgets.import_game_button.add_controller(drop_target);
+        }
 
         let about_dialog_broker: MessageBroker<AboutDialogMsg> = MessageBroker::new();
 
@@ -1147,6 +1202,49 @@ impl SimpleComponent for App {
                 repair_game::repair_game(sender, self.progress_bar.sender().to_owned())
             }
 
+            AppMsg::RemakePrefix => {
+                let config = Config::get().unwrap();
+                let prefix = config.game.wine.prefix.clone();
+
+                if prefix.exists() {
+                    if let Err(err) = std::fs::remove_dir_all(&prefix) {
+                        tracing::error!("Failed to remove wine prefix: {err}");
+
+                        sender.input(AppMsg::Toast {
+                            title: tr!("wine-prefix-update-failed"),
+                            description: Some(err.to_string())
+                        });
+
+                        return;
+                    }
+                }
+
+                sender.input(AppMsg::UpdateLauncherState {
+                    perform_on_download_needed: false,
+                    show_status_page: true
+                });
+            }
+
+            AppMsg::ImportGame => {
+                relm4::spawn(clone!(
+                    #[strong]
+                    sender,
+                    async move {
+                        if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
+                            sender.input(AppMsg::ImportGameFromPath(folder.path().to_path_buf()));
+                        }
+                    }
+                ));
+            }
+
+            AppMsg::ImportGameFromPath(path) => {
+                std::thread::spawn(clone!(
+                    #[strong]
+                    sender,
+                    move || import_game::import_game(sender, path)
+                ));
+            }
+
             #[allow(unused_must_use)]
             AppMsg::PredownloadUpdate => {
                 if let Some(LauncherState::PredownloadAvailable {
@@ -1249,6 +1347,8 @@ impl SimpleComponent for App {
                 MAIN_WINDOW.as_ref().unwrap_unchecked().present();
             },
 
+            AppMsg::SuggestTimeoutFix => self.suggest_timeout_fix(),
+
             AppMsg::Toast {
                 title,
                 description
@@ -1258,6 +1358,41 @@ impl SimpleComponent for App {
 }
 
 impl App {
+    pub fn suggest_timeout_fix(&self) {
+        #[allow(static_mut_refs)]
+        let Some(window) = (unsafe { MAIN_WINDOW.as_ref() }) else {
+            return;
+        };
+
+        let dialog = adw::MessageDialog::new(
+            Some(window),
+            Some(&tr!("timeout-fix-detected")),
+            Some(&tr!("timeout-fix-detected-description"))
+        );
+
+        dialog.add_response("ignore", &tr!("close"));
+        dialog.add_response("enable", &tr!("enable"));
+
+        dialog.set_response_appearance("enable", adw::ResponseAppearance::Suggested);
+
+        dialog.connect_response(Some("enable"), |_, _| {
+            if let Ok(mut config) = Config::get() {
+                config.game.wine.timeout_fix = true;
+
+                Config::update(config);
+            }
+
+            #[allow(static_mut_refs)]
+            unsafe {
+                if let Some(prefs) = PREFERENCES_WINDOW.as_ref() {
+                    prefs.emit(PreferencesAppMsg::SetTimeoutFix(true));
+                }
+            }
+        });
+
+        dialog.present();
+    }
+
     pub fn toast<T: AsRef<str>>(&mut self, title: T, description: Option<T>) {
         let toast = adw::Toast::new(title.as_ref());
 

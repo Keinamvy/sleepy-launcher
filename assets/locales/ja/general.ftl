@@ -70,3 +70,5 @@ explorer = エクスプローラー
 task-manager = タスクマネージャー
 configuration = 構成
 debugger = デバッガー
+
+remake-prefix = Remake prefix
