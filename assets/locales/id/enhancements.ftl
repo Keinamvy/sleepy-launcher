@@ -56,3 +56,6 @@ borderless = Tanpa border
 headless = Headless
 popup = Popup
 fullscreen = Penuhi layar
+
+timeout-fix = Enable timeout fix
+timeout-fix-description = Set WINE_ENABLE_TIMEOUT_FIX=1 to work around crash shortly after launch

@@ -56,3 +56,6 @@ borderless = 테두리 없는 창 모드
 headless = Headless
 popup = 팝업
 fullscreen = 전체 화면
+
+timeout-fix = Enable timeout fix
+timeout-fix-description = Set WINE_ENABLE_TIMEOUT_FIX=1 to work around crash shortly after launch

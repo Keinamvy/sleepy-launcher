@@ -89,3 +89,13 @@ main-window--version-outdated-tooltip = Версия слишком стара �
 preferences = Настройки
 general = Основное
 enhancements = Улучшения
+
+enable = Enable
+
+timeout-fix-detected = Driver error detected
+timeout-fix-detected-description =
+    The game exited within a few seconds and a driver error log was found.
+    This usually means the connection to Zenless Zone Zero's servers timed out.
+
+    Latest Spritz-based Wine runners can work around this via WINE_ENABLE_TIMEOUT_FIX=1.
+    Do you want to enable it?

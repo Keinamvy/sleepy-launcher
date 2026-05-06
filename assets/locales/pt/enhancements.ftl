@@ -56,3 +56,6 @@ borderless = Sem borda
 headless = Headless
 popup = Popup
 fullscreen = Tela cheia
+
+timeout-fix = Enable timeout fix
+timeout-fix-description = Set WINE_ENABLE_TIMEOUT_FIX=1 to work around crash shortly after launch

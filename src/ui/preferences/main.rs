@@ -32,6 +32,7 @@ pub enum PreferencesAppMsg {
 
     UpdateLauncherState,
     RepairGame,
+    SetTimeoutFix(bool),
 
     Toast {
         title: String,
@@ -133,6 +134,10 @@ impl SimpleAsyncComponent for PreferencesApp {
                 PREFERENCES_WINDOW.as_ref().unwrap_unchecked().close();
 
                 sender.output(Self::Output::RepairGame);
+            }
+
+            PreferencesAppMsg::SetTimeoutFix(value) => {
+                self.enhancements.emit(EnhancementsAppMsg::SetTimeoutFix(value));
             }
 
             PreferencesAppMsg::Toast { title, description } => unsafe {

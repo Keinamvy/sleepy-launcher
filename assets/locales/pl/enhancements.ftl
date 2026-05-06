@@ -56,3 +56,6 @@ borderless = Okno bezramkowe
 headless = Headless
 popup = Wyskakujące okno
 fullscreen = Pełny ekran
+
+timeout-fix = Enable timeout fix
+timeout-fix-description = Set WINE_ENABLE_TIMEOUT_FIX=1 to work around crash shortly after launch
