@@ -7,11 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added "Remake prefix" button
+- Added "Import game" button
+- Added setting to enable Winewayland to make the game use Wayland instead of X11
+- Added a setting to enable "Timeout fix"
+- Added automatic detection and suggestion for the "Timeout fix" setting
+
 ### Fixed
 
 - Fixed a panic when the launcher folder is a broken symlink, the launcher will exit with an
   error message instead
 - Fixed search url extractor
+
+### Changed
+
+- Changed .version file format to be a textual file taht can be edited in a text editor.
+  Old format files will still work correctly and will be overwritten on game update.
 
 ## [1.6.2] - 2026-01-03
 
