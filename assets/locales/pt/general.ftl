@@ -69,3 +69,5 @@ explorer = Explorador
 task-manager = Gerenciador de tarefas
 configuration = Configuração
 debugger = Debugador
+
+remake-prefix = Remake prefix

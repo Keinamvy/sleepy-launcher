@@ -32,6 +32,7 @@ pub enum PreferencesAppMsg {
 
     UpdateLauncherState,
     RepairGame,
+    RemakePrefix,
     SetTimeoutFix(bool),
 
     Toast {
@@ -134,6 +135,13 @@ impl SimpleAsyncComponent for PreferencesApp {
                 PREFERENCES_WINDOW.as_ref().unwrap_unchecked().close();
 
                 sender.output(Self::Output::RepairGame);
+            }
+
+            #[allow(unused_must_use)]
+            PreferencesAppMsg::RemakePrefix => unsafe {
+                PREFERENCES_WINDOW.as_ref().unwrap_unchecked().close();
+
+                sender.output(Self::Output::RemakePrefix);
             }
 
             PreferencesAppMsg::SetTimeoutFix(value) => {

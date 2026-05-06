@@ -93,3 +93,5 @@ timeout-fix-detected-description =
 
     Latest Spritz-based Wine runners can work around this via WINE_ENABLE_TIMEOUT_FIX=1.
     Do you want to enable it?
+
+import-game = Import game

@@ -70,3 +70,5 @@ explorer = Utforskaren
 task-manager = Aktivitetshanteraren
 configuration = Konfiguration
 debugger = Debugger
+
+remake-prefix = Remake prefix

@@ -70,3 +70,5 @@ explorer = Explorer
 task-manager = Feladatkezelő
 configuration = Konfiguráció
 debugger = Debugger
+
+remake-prefix = Remake prefix

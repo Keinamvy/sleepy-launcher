@@ -70,3 +70,5 @@ explorer = Prohlížeč souborů
 task-manager = Správce úloh
 configuration = Nastavení
 debugger = Debugger
+
+remake-prefix = Remake prefix
