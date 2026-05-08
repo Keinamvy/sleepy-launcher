@@ -58,6 +58,7 @@
         <p>Added automatic detection and suggestion for the "Timeout fix" setting</p>
         <p>Fixed a panic when the launcher folder is a broken symlink, the launcher will exit with an error message instead</p>
         <p>Fixed search url extractor</p>
+        <p>Changed .version file format to be a textual file that can be edited in a text editor. Old format files will still work correctly and will be overwritten on game update.</p>
       </description>
     </release>
     <release version="1.6.2" date="2026-01-03">

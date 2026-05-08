@@ -105,7 +105,13 @@ impl SimpleComponent for AboutDialog {
                 "<ul>",
                     "<li>Fixed a panic when the launcher folder is a broken symlink, the launcher will exit with an error message instead</li>",
                     "<li>Fixed search url extractor</li>",
-                "</ul>"
+                "</ul>",
+
+                "<p>Changed</p>",
+
+                "<ul>",
+                    "<li>Changed .version file format to be a textual file that can be edited in a text editor. Old format files will still work correctly and will be overwritten on game update.</li>",
+                "</ul>",
             ].join("\n"),
 
             set_modal: true,
