@@ -22,24 +22,39 @@ pub fn launch(sender: ComponentSender<App>) {
     }
 
     std::thread::spawn(move || {
-        if let Err(err) = anime_launcher_sdk::zzz::game::run() {
-            tracing::error!("Failed to launch game: {err}");
+        let suggest_timeout_fix = match anime_launcher_sdk::zzz::game::run() {
+            Ok(suggest) => suggest,
+            Err(err) => {
+                tracing::error!("Failed to launch game: {err}");
 
-            sender.input(AppMsg::Toast {
-                title: tr!("game-launching-failed"),
-                description: Some(err.to_string())
-            });
-        }
+                sender.input(AppMsg::Toast {
+                    title: tr!("game-launching-failed"),
+                    description: Some(err.to_string())
+                });
+
+                false
+            }
+        };
 
         match config.launcher.behavior {
             // Enable launch button and hide kill game button if behavior set to "Nothing" after the game has closed
             LauncherBehavior::Nothing => {
                 sender.input(AppMsg::DisableButtons(false));
                 sender.input(AppMsg::SetKillGameButton(false));
+
+                if suggest_timeout_fix {
+                    sender.input(AppMsg::SuggestTimeoutFix);
+                }
             }
 
             // Show back launcher window if behavior set to "Hide" and the game has closed
-            LauncherBehavior::Hide => sender.input(AppMsg::ShowWindow),
+            LauncherBehavior::Hide => {
+                sender.input(AppMsg::ShowWindow);
+
+                if suggest_timeout_fix {
+                    sender.input(AppMsg::SuggestTimeoutFix);
+                }
+            }
 
             // Otherwise close the launcher if behavior set to "Close" and the game has closed
             // We're calling quit method from the main context here because otherwise app won't be closed properly

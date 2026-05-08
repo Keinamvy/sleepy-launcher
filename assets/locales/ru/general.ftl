@@ -70,3 +70,5 @@ explorer = Проводник
 task-manager = Диспетчер задач
 configuration = Настройки
 debugger = Отладчик
+
+remake-prefix = Remake prefix

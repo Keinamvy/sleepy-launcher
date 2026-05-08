@@ -70,3 +70,5 @@ explorer = 탐색기
 task-manager = 작업 관리자
 configuration = 구성
 debugger = 디버거
+
+remake-prefix = Remake prefix

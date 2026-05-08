@@ -47,16 +47,18 @@ pub fn download_background(with_video: bool, index: u8) -> anyhow::Result<()> {
 
 #[cached::proc_macro::cached(result)]
 pub fn get_background_info_multiple() -> anyhow::Result<Vec<BackgroundSpec>> {
-    let json =
-        serde_json::from_slice::<serde_json::Value>(minreq::get(get_uri()).send()?.as_bytes())?;
+    let json = serde_json::from_slice::<serde_json::Value>(
+        minreq::get(get_uri()).with_timeout(15).send()?.as_bytes()
+    )?;
 
     BackgroundSpec::from_json_all(&json)
 }
 
 #[cached::proc_macro::cached(result)]
 pub fn get_background_info(index: u8) -> anyhow::Result<BackgroundSpec> {
-    let json =
-        serde_json::from_slice::<serde_json::Value>(minreq::get(get_uri()).send()?.as_bytes())?;
+    let json = serde_json::from_slice::<serde_json::Value>(
+        minreq::get(get_uri()).with_timeout(15).send()?.as_bytes()
+    )?;
 
     BackgroundSpec::from_json_single(&json, index)
 }

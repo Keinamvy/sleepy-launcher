@@ -70,3 +70,5 @@ explorer = Explorer
 task-manager = Task manager
 configuration = Konfiguration
 debugger = Debugger
+
+remake-prefix = Remake prefix

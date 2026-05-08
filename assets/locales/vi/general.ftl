@@ -78,3 +78,5 @@ explorer = Duyệt thư mục
 task-manager = Trình quản lý tác vụ
 configuration = Cấu hình
 debugger = Trình gỡ lỗi
+
+remake-prefix = Remake prefix
