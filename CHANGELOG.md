@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.4] - 2026-05-09
+
+### Fixed
+
+- Fixed "Path not mounted" error when checking for free space during component download
+
 ## [1.6.3] - 2026-05-08
 
 ### Added
