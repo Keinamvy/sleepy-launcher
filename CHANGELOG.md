@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Changed .version file format to be a textual file taht can be edited in a text editor.
+- Changed .version file format to be a textual file that can be edited in a text editor.
   Old format files will still work correctly and will be overwritten on game update.
 
 ## [1.6.2] - 2026-01-03
