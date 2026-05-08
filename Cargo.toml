@@ -2,7 +2,10 @@
 name = "sleepy-launcher"
 version = "1.6.3"
 description = "Sleepy launcher"
-authors = ["Nikita Podvirnyi <krypt0nn@vk.com>"]
+authors = [
+    "Nikita Podvirnyi <krypt0nn@vk.com>",
+    "@JohnTheCoolingFan <https://github.com/JohnTheCoolingFan>"
+]
 homepage = "https://github.com/an-anime-team/sleepy-launcher"
 repository = "https://github.com/an-anime-team/sleepy-launcher"
 license = "GPL-3.0"
@@ -19,7 +22,7 @@ glib-build-tools = "0.20"
 
 [dependencies.anime-launcher-sdk]
 git = "https://github.com/an-anime-team/anime-launcher-sdk"
-tag = "1.35.3"
+tag = "1.35.4"
 features = ["all", "zzz"]
 
 # path = "../anime-launcher-sdk" # ! for dev purposes only

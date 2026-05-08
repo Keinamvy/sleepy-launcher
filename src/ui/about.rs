@@ -42,7 +42,8 @@ impl SimpleComponent for AboutDialog {
             set_version: &APP_VERSION,
 
             set_developers: &[
-                "Nikita Podvirnyi https://github.com/krypt0nn"
+                "Nikita Podvirnyi https://github.com/krypt0nn",
+                "@JohnTheCoolingFan <https://github.com/JohnTheCoolingFan>"
             ],
 
             add_credit_section: (Some("An Anime Team"), &[
@@ -51,7 +52,8 @@ impl SimpleComponent for AboutDialog {
                 "Luna Neff  https://github.com/lunaneff",
                 "Renaud Lepage https://github.com/cybik",
                 "Soham Nandy https://github.com/natimerry",
-                "@mkrsym1 https://github.com/mkrsym1"
+                "@mkrsym1 https://github.com/mkrsym1",
+                "@JohnTheCoolingFan <https://github.com/JohnTheCoolingFan>"
             ]),
 
             set_translator_credits: &[
@@ -90,27 +92,10 @@ impl SimpleComponent for AboutDialog {
 
             set_release_notes_version: &APP_VERSION,
             set_release_notes: &[
-                "<p>Added</p>",
-
-                "<ul>",
-                    "<li>Added 'Remake prefix' button</li>",
-                    "<li>Added 'Import game' button</li>",
-                    "<li>Added setting to enable Winewayland to make the game use Wayland instead of X11</li>",
-                    "<li>Added a setting to enable 'Timeout fix'</li>",
-                    "<li>Added automatic detection and suggestion for the 'Timeout fix' setting</li>",
-                "</ul>",
-
                 "<p>Fixed</p>",
 
                 "<ul>",
-                    "<li>Fixed a panic when the launcher folder is a broken symlink, the launcher will exit with an error message instead</li>",
-                    "<li>Fixed search url extractor</li>",
-                "</ul>",
-
-                "<p>Changed</p>",
-
-                "<ul>",
-                    "<li>Changed .version file format to be a textual file that can be edited in a text editor. Old format files will still work correctly and will be overwritten on game update.</li>",
+                    "<li>Fixed 'Path not mounted' error when checking for free space during component download</li>",
                 "</ul>",
             ].join("\n"),
 
