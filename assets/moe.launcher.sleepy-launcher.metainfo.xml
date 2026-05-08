@@ -49,6 +49,17 @@
   </categories>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="1.6.3" date="2026-05-08">
+      <description>
+        <p>Added "Remake prefix" button</p>
+        <p>Added "Import game" button</p>
+        <p>Added setting to enable Winewayland to make the game use Wayland instead of X11</p>
+        <p>Added a setting to enable "Timeout fix"</p>
+        <p>Added automatic detection and suggestion for the "Timeout fix" setting</p>
+        <p>Fixed a panic when the launcher folder is a broken symlink, the launcher will exit with an error message instead</p>
+        <p>Fixed search url extractor</p>
+      </description>
+    </release>
     <release version="1.6.2" date="2026-01-03">
       <description>
         <p>The video background will now pause when the game is launched</p>

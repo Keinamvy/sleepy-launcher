@@ -1,6 +1,5 @@
 use relm4::prelude::*;
 use gtk::prelude::*;
-
 use anime_launcher_sdk::VERSION as SDK_VERSION;
 use anime_launcher_sdk::anime_game_core::VERSION as CORE_VERSION;
 
@@ -94,14 +93,18 @@ impl SimpleComponent for AboutDialog {
                 "<p>Added</p>",
 
                 "<ul>",
-                    "<li>The video background will now pause when the game is launched</li>",
-                    "<li>The video background is muted (the audio output still exists, file's audio is ignored)</li>",
+                    "<li>Added 'Remake prefix' button</li>",
+                    "<li>Added 'Import game' button</li>",
+                    "<li>Added setting to enable Winewayland to make the game use Wayland instead of X11</li>",
+                    "<li>Added a setting to enable 'Timeout fix'</li>",
+                    "<li>Added automatic detection and suggestion for the 'Timeout fix' setting</li>",
                 "</ul>",
 
-                "<p>Changed</p>",
+                "<p>Fixed</p>",
 
                 "<ul>",
-                    "<li>Changed the way the video background is displayed, improving the look when the window is resized</li>",
+                    "<li>Fixed a panic when the launcher folder is a broken symlink, the launcher will exit with an error message instead</li>",
+                    "<li>Fixed search url extractor</li>",
                 "</ul>"
             ].join("\n"),
 
@@ -119,7 +122,11 @@ impl SimpleComponent for AboutDialog {
         }
     }
 
-    fn init(_init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+    fn init(
+        _init: Self::Init,
+        root: Self::Root,
+        sender: ComponentSender<Self>
+    ) -> ComponentParts<Self> {
         tracing::info!("Initializing about dialog");
 
         let model = Self {
@@ -128,7 +135,10 @@ impl SimpleComponent for AboutDialog {
 
         let widgets = view_output!();
 
-        ComponentParts { model, widgets }
+        ComponentParts {
+            model,
+            widgets
+        }
     }
 
     fn update(&mut self, msg: Self::Input, _sender: ComponentSender<Self>) {
