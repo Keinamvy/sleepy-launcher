@@ -620,7 +620,7 @@ impl SimpleComponent for App {
                                         gtk::Button {
                                             set_width_request: 44,
                                             set_css_classes: &["circular"],
-                                            set_icon_name: "document-import-symbolic",
+                                            set_icon_name: "document-open-symbolic",
                                             set_tooltip_text: Some(&tr!("import-game")),
 
                                             #[watch]
@@ -1360,7 +1360,8 @@ impl SimpleComponent for App {
 impl App {
     pub fn suggest_timeout_fix(&self) {
         #[allow(static_mut_refs)]
-        let Some(window) = (unsafe { MAIN_WINDOW.as_ref() }) else {
+        let Some(window) = (unsafe { MAIN_WINDOW.as_ref() })
+        else {
             return;
         };
 
