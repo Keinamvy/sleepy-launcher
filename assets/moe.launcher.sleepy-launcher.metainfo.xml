@@ -49,11 +49,17 @@
   </categories>
   <content_rating type="oars-1.1" />
   <releases>
-   <release version="1.6.4" date="2026-05-09">
-     <description>
+    <release version="1.6.5" date="2026-05-16">
+      <description>
+        <p>Added additional methods of detecting game version</p>
+        <p>Fixed game version detection on import</p>
+      </description>
+    </release>
+    <release version="1.6.4" date="2026-05-09">
+      <description>
         <p>Fixed "Path not mounted" error when checking for free space during component download</p>
-     </description>
-   </release>
+      </description>
+    </release>
     <release version="1.6.3" date="2026-05-08">
       <description>
         <p>Added "Remake prefix" button</p>
