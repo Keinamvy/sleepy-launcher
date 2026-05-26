@@ -30,17 +30,36 @@ use super::about::*;
 relm4::new_action_group!(WindowActionGroup, "win");
 
 relm4::new_stateless_action!(LauncherFolder, WindowActionGroup, "launcher_folder");
-relm4::new_stateless_action!(GameFolder, WindowActionGroup, "game_folder");
-relm4::new_stateless_action!(ConfigFile, WindowActionGroup, "config_file");
-relm4::new_stateless_action!(DebugFile, WindowActionGroup, "debug_file");
+relm4::new_stateless_action!(GameFolder,     WindowActionGroup, "game_folder");
+relm4::new_stateless_action!(ConfigFile,     WindowActionGroup, "config_file");
+relm4::new_stateless_action!(DebugFile,      WindowActionGroup, "debug_file");
 
 relm4::new_stateless_action!(SignalSearchUrl, WindowActionGroup, "signal_search_url");
+relm4::new_stateless_action!(About,           WindowActionGroup, "about");
 
-relm4::new_stateless_action!(About, WindowActionGroup, "about");
-
-pub static mut MAIN_WINDOW: Option<adw::ApplicationWindow> = None;
+pub static mut MAIN_WINDOW:       Option<adw::ApplicationWindow>          = None;
 pub static mut PREFERENCES_WINDOW: Option<AsyncController<PreferencesApp>> = None;
-pub static mut ABOUT_DIALOG: Option<Controller<AboutDialog>> = None;
+pub static mut ABOUT_DIALOG:      Option<Controller<AboutDialog>>         = None;
+
+// ---------------------------------------------------------------------------
+// Helper macro — wraps ComponentSender::input() so that a dropped controller
+// (runtime shutdown while a background thread is still running) produces a
+// warning instead of a process-level panic.
+// ---------------------------------------------------------------------------
+macro_rules! try_send {
+    ($sender:expr, $msg:expr) => {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            $sender.input($msg);
+        })) {
+            Ok(_) => {}
+            Err(_) => {
+                tracing::warn!(
+                    "Component sender closed before background thread finished — message dropped."
+                );
+            }
+        }
+    };
+}
 
 pub struct App {
     progress_bar: AsyncController<ProgressBar>,
@@ -56,7 +75,7 @@ pub struct App {
     downloading: bool,
     disabled_buttons: bool,
     kill_game_button: bool,
-    disabled_kill_game_button: bool
+    disabled_kill_game_button: bool,
 }
 
 #[derive(Debug)]
@@ -67,7 +86,7 @@ pub enum AppMsg {
         perform_on_download_needed: bool,
 
         /// Show status gathering progress page
-        show_status_page: bool
+        show_status_page: bool,
     },
 
     /// Supposed to be called automatically on app's run when the latest game
@@ -105,8 +124,8 @@ pub enum AppMsg {
 
     Toast {
         title: String,
-        description: Option<String>
-    }
+        description: Option<String>,
+    },
 }
 
 #[relm4::component(pub)]
@@ -119,15 +138,13 @@ impl SimpleComponent for App {
         main_menu: {
             section! {
                 &tr!("launcher-folder") => LauncherFolder,
-                &tr!("game-folder") => GameFolder,
-                &tr!("config-file") => ConfigFile,
-                &tr!("debug-file") => DebugFile,
+                &tr!("game-folder")     => GameFolder,
+                &tr!("config-file")     => ConfigFile,
+                &tr!("debug-file")      => DebugFile,
             },
-
             section! {
                 &tr!("signal-search-url") => SignalSearchUrl
             },
-
             section! {
                 &tr!("about") => About
             }
@@ -141,11 +158,11 @@ impl SimpleComponent for App {
             #[watch]
             set_default_size: (
                 match model.style {
-                    LauncherStyle::Modern => 900,
-                    LauncherStyle::Classic => 1152 // (w = 2560 / 1440 * h, where 2560x1440 is default background picture resolution)
+                    LauncherStyle::Modern  => 900,
+                    LauncherStyle::Classic => 1152
                 },
                 match model.style {
-                    LauncherStyle::Modern => 600,
+                    LauncherStyle::Modern  => 600,
                     LauncherStyle::Classic => 648
                 }
             ),
@@ -181,14 +198,21 @@ impl SimpleComponent for App {
                         set_valign: gtk::Align::Fill,
                         set_content_fit: gtk::ContentFit::Cover,
                         #[watch]
-                        set_visible: model.style == LauncherStyle::Classic && model.use_video_background && model.loading.is_none() && crate::BACKGROUND_VIDEO_FILE.exists(),
+                        set_visible: model.style == LauncherStyle::Classic
+                            && model.use_video_background
+                            && model.loading.is_none()
+                            && crate::BACKGROUND_VIDEO_FILE.exists(),
 
                         #[wrap(Some)]
                         set_paintable = &gtk::MediaFile::for_filename(crate::BACKGROUND_VIDEO_FILE.as_path()) {
                             set_muted: true,
                             set_loop: true,
                             #[watch]
-                            set_playing: !model.kill_game_button && model.style == LauncherStyle::Classic && model.use_video_background && model.loading.is_none() && crate::BACKGROUND_VIDEO_FILE.exists(),
+                            set_playing: !model.kill_game_button
+                                && model.style == LauncherStyle::Classic
+                                && model.use_video_background
+                                && model.loading.is_none()
+                                && crate::BACKGROUND_VIDEO_FILE.exists(),
 
                             connect_error_notify: |mstream| {
                                 if let Some(err) = mstream.error() {
@@ -200,7 +224,14 @@ impl SimpleComponent for App {
 
                     add_overlay = &gtk::Box {
                         #[watch]
-                        set_css_classes: if model.style == LauncherStyle::Classic && model.use_video_background && model.loading.is_none() {&["background-overlay"]} else {&[""]},
+                        set_css_classes: if model.style == LauncherStyle::Classic
+                            && model.use_video_background
+                            && model.loading.is_none()
+                        {
+                            &["background-overlay"]
+                        } else {
+                            &[""]
+                        },
                     },
 
                     #[name = "ui_contents"]
@@ -210,7 +241,7 @@ impl SimpleComponent for App {
                         adw::HeaderBar {
                             #[watch]
                             set_css_classes: match model.style {
-                                LauncherStyle::Modern => &[""],
+                                LauncherStyle::Modern  => &[""],
                                 LauncherStyle::Classic => &["flat"]
                             },
 
@@ -218,7 +249,7 @@ impl SimpleComponent for App {
                             set_title_widget = &adw::WindowTitle {
                                 #[watch]
                                 set_title: match model.style {
-                                    LauncherStyle::Modern => "Sleepy Launcher",
+                                    LauncherStyle::Modern  => "Sleepy Launcher",
                                     LauncherStyle::Classic => ""
                                 }
                             },
@@ -270,13 +301,13 @@ impl SimpleComponent for App {
                             add = &adw::PreferencesGroup {
                                 #[watch]
                                 set_valign: match model.style {
-                                    LauncherStyle::Modern => gtk::Align::Center,
+                                    LauncherStyle::Modern  => gtk::Align::Center,
                                     LauncherStyle::Classic => gtk::Align::End
                                 },
 
                                 #[watch]
                                 set_width_request: match model.style {
-                                    LauncherStyle::Modern => -1,
+                                    LauncherStyle::Modern  => -1,
                                     LauncherStyle::Classic => 800
                                 },
 
@@ -293,13 +324,13 @@ impl SimpleComponent for App {
                             add = &adw::PreferencesGroup {
                                 #[watch]
                                 set_valign: match model.style {
-                                    LauncherStyle::Modern => gtk::Align::Center,
+                                    LauncherStyle::Modern  => gtk::Align::Center,
                                     LauncherStyle::Classic => gtk::Align::End
                                 },
 
                                 #[watch]
                                 set_width_request: match model.style {
-                                    LauncherStyle::Modern => -1,
+                                    LauncherStyle::Modern  => -1,
                                     LauncherStyle::Classic => 800
                                 },
 
@@ -308,7 +339,7 @@ impl SimpleComponent for App {
 
                                 #[watch]
                                 set_margin_bottom: match model.style {
-                                    LauncherStyle::Modern => 48,
+                                    LauncherStyle::Modern  => 48,
                                     LauncherStyle::Classic => 0
                                 },
 
@@ -317,19 +348,20 @@ impl SimpleComponent for App {
                                 gtk::Box {
                                     #[watch]
                                     set_halign: match model.style {
-                                        LauncherStyle::Modern => gtk::Align::Center,
+                                        LauncherStyle::Modern  => gtk::Align::Center,
                                         LauncherStyle::Classic => gtk::Align::End
                                     },
 
                                     #[watch]
                                     set_height_request: match model.style {
-                                        LauncherStyle::Modern => -1,
+                                        LauncherStyle::Modern  => -1,
                                         LauncherStyle::Classic => 40
                                     },
 
                                     set_margin_top: 64,
                                     set_spacing: 8,
 
+                                    // ── Pre-download button ─────────────────
                                     adw::Bin {
                                         set_css_classes: &["background", "round-bin"],
 
@@ -342,34 +374,31 @@ impl SimpleComponent for App {
                                                     Some(LauncherState::PredownloadAvailable { game, .. }) => game.latest().to_string(),
                                                     _ => String::from("?")
                                                 },
-
                                                 "size" = match model.state.as_ref() {
                                                     Some(LauncherState::PredownloadAvailable { game }) => {
                                                         let size = game.downloaded_size().unwrap_or(0);
-
                                                         prettify_bytes(size)
                                                     }
-
                                                     _ => String::from("?")
                                                 }
                                             })),
 
                                             #[watch]
-                                            set_visible: matches!(model.state.as_ref(), Some(LauncherState::PredownloadAvailable { .. })),
+                                            set_visible: matches!(
+                                                model.state.as_ref(),
+                                                Some(LauncherState::PredownloadAvailable { .. })
+                                            ),
 
                                             #[watch]
                                             set_sensitive: match model.state.as_ref() {
                                                 Some(LauncherState::PredownloadAvailable { game }) => {
                                                     let config = Config::get().unwrap();
                                                     let temp = config.launcher.temp.unwrap_or_else(std::env::temp_dir);
-
                                                     let downloaded = temp.join(game.file_name().unwrap()).metadata()
                                                         .map(|metadata| Some(metadata.len()) >= game.downloaded_size())
                                                         .unwrap_or(false);
-
                                                     !downloaded
                                                 }
-
                                                 _ => false
                                             },
 
@@ -378,18 +407,12 @@ impl SimpleComponent for App {
                                                 Some(LauncherState::PredownloadAvailable { game }) => {
                                                     let config = Config::get().unwrap();
                                                     let temp = config.launcher.temp.unwrap_or_else(std::env::temp_dir);
-
                                                     let downloaded = temp.join(game.file_name().unwrap()).metadata()
                                                         .map(|metadata| Some(metadata.len()) >= game.downloaded_size())
                                                         .unwrap_or(false);
-
-                                                    if downloaded {
-                                                        &["success", "circular"]
-                                                    } else {
-                                                        &["warning", "circular"]
-                                                    }
+                                                    if downloaded { &["success", "circular"] }
+                                                    else          { &["warning", "circular"] }
                                                 }
-
                                                 _ => &["warning", "circular"]
                                             },
 
@@ -400,6 +423,7 @@ impl SimpleComponent for App {
                                         }
                                     },
 
+                                    // ── Main action button ──────────────────
                                     adw::Bin {
                                         set_css_classes: &["background", "round-bin"],
 
@@ -411,19 +435,23 @@ impl SimpleComponent for App {
                                                 #[watch]
                                                 set_icon_name: match &model.state {
                                                     Some(LauncherState::Launch) |
-                                                    Some(LauncherState::PredownloadAvailable { .. }) => "media-playback-start-symbolic",
+                                                    Some(LauncherState::PredownloadAvailable { .. })
+                                                        => "media-playback-start-symbolic",
 
                                                     Some(LauncherState::FolderMigrationRequired { .. }) |
                                                     Some(LauncherState::WineNotInstalled) |
                                                     Some(LauncherState::PrefixNotExists) |
-                                                    Some(LauncherState::DxvkNotInstalled) => "document-save-symbolic",
+                                                    Some(LauncherState::DxvkNotInstalled)
+                                                        => "document-save-symbolic",
 
                                                     Some(LauncherState::GameUpdateAvailable(_)) |
                                                     Some(LauncherState::GameNotInstalled(_)) |
                                                     Some(LauncherState::VoiceUpdateAvailable(_)) |
-                                                    Some(LauncherState::VoiceNotInstalled(_)) => "document-save-symbolic",
+                                                    Some(LauncherState::VoiceNotInstalled(_))
+                                                        => "document-save-symbolic",
 
-                                                    Some(LauncherState::TelemetryNotDisabled) => "security-high-symbolic",
+                                                    Some(LauncherState::TelemetryNotDisabled)
+                                                        => "security-high-symbolic",
 
                                                     Some(LauncherState::GameOutdated(_)) |
                                                     Some(LauncherState::VoiceOutdated(_)) |
@@ -433,14 +461,20 @@ impl SimpleComponent for App {
                                                 #[watch]
                                                 set_label: &match &model.state {
                                                     Some(LauncherState::Launch) |
-                                                    Some(LauncherState::PredownloadAvailable { .. }) => tr!("launch"),
+                                                    Some(LauncherState::PredownloadAvailable { .. })
+                                                        => tr!("launch"),
 
-                                                    Some(LauncherState::FolderMigrationRequired { .. }) => tr!("migrate-folders"),
-                                                    Some(LauncherState::TelemetryNotDisabled) => tr!("disable-telemetry"),
+                                                    Some(LauncherState::FolderMigrationRequired { .. })
+                                                        => tr!("migrate-folders"),
+                                                    Some(LauncherState::TelemetryNotDisabled)
+                                                        => tr!("disable-telemetry"),
 
-                                                    Some(LauncherState::WineNotInstalled) => tr!("download-wine"),
-                                                    Some(LauncherState::PrefixNotExists)  => tr!("create-prefix"),
-                                                    Some(LauncherState::DxvkNotInstalled) => tr!("install-dxvk"),
+                                                    Some(LauncherState::WineNotInstalled)
+                                                        => tr!("download-wine"),
+                                                    Some(LauncherState::PrefixNotExists)
+                                                        => tr!("create-prefix"),
+                                                    Some(LauncherState::DxvkNotInstalled)
+                                                        => tr!("install-dxvk"),
 
                                                     Some(LauncherState::GameUpdateAvailable(diff)) |
                                                     Some(LauncherState::GameOutdated(diff)) |
@@ -448,23 +482,18 @@ impl SimpleComponent for App {
                                                     Some(LauncherState::VoiceOutdated(diff)) => {
                                                         match (Config::get(), diff.file_name()) {
                                                             (Ok(config), Some(filename)) => {
-                                                                let temp = config.launcher.temp.unwrap_or_else(std::env::temp_dir);
-
-                                                                if temp.join(filename).exists() {
-                                                                    tr!("resume")
-                                                                }
-
-                                                                else {
-                                                                    tr!("update")
-                                                                }
+                                                                let temp = config.launcher.temp
+                                                                    .unwrap_or_else(std::env::temp_dir);
+                                                                if temp.join(filename).exists() { tr!("resume") }
+                                                                else                            { tr!("update") }
                                                             }
-
                                                             _ => tr!("update")
                                                         }
-                                                    },
+                                                    }
 
                                                     Some(LauncherState::GameNotInstalled(_)) |
-                                                    Some(LauncherState::VoiceNotInstalled(_)) => tr!("download"),
+                                                    Some(LauncherState::VoiceNotInstalled(_))
+                                                        => tr!("download"),
 
                                                     None => String::from("...")
                                                 }
@@ -474,27 +503,25 @@ impl SimpleComponent for App {
                                             set_sensitive: !model.disabled_buttons && match &model.state {
                                                 Some(LauncherState::GameOutdated { .. }) |
                                                 Some(LauncherState::VoiceOutdated(_)) => false,
-
                                                 Some(_) => true,
-                                                None => false
+                                                None    => false
                                             },
 
                                             #[watch]
                                             set_css_classes: match &model.state {
                                                 Some(LauncherState::GameOutdated { .. }) |
                                                 Some(LauncherState::VoiceOutdated(_)) => &["warning", "pill"],
-
                                                 Some(_) => &["suggested-action", "pill"],
-                                                None => &["pill"]
+                                                None    => &["pill"]
                                             },
 
                                             #[watch]
                                             set_tooltip_text: Some(&match &model.state {
                                                 Some(LauncherState::GameOutdated { .. }) |
-                                                Some(LauncherState::VoiceOutdated(_)) => tr!("main-window--version-outdated-tooltip"),
-
-                                                Some(LauncherState::FolderMigrationRequired { .. }) => tr!("migrate-folders-tooltip"),
-
+                                                Some(LauncherState::VoiceOutdated(_))
+                                                    => tr!("main-window--version-outdated-tooltip"),
+                                                Some(LauncherState::FolderMigrationRequired { .. })
+                                                    => tr!("migrate-folders-tooltip"),
                                                 _ => String::new()
                                             }),
 
@@ -505,6 +532,7 @@ impl SimpleComponent for App {
                                         }
                                     },
 
+                                    // ── Kill game button ────────────────────
                                     adw::Bin {
                                         set_css_classes: &["background", "round-bin"],
 
@@ -513,7 +541,7 @@ impl SimpleComponent for App {
 
                                         gtk::Button {
                                             adw::ButtonContent {
-                                                set_icon_name: "violence-symbolic", // window-close-symbolic
+                                                set_icon_name: "violence-symbolic",
                                                 set_label: &tr!("kill-game-process")
                                             },
 
@@ -521,27 +549,29 @@ impl SimpleComponent for App {
                                             set_sensitive: !model.disabled_kill_game_button,
 
                                             set_css_classes: &["error", "pill"],
-
                                             set_hexpand: false,
                                             set_width_request: 200,
 
                                             connect_clicked[sender] => move |_| {
                                                 sender.input(AppMsg::DisableKillGameButton(true));
 
+                                                // Re-enable the button after 3 s.
+                                                // Use try_send! in case the window closes
+                                                // before the timer fires.
                                                 std::thread::spawn(clone!(
                                                     #[strong]
                                                     sender,
-
                                                     move || {
-                                                        std::thread::sleep(std::time::Duration::from_secs(3));
-
-                                                        sender.input(AppMsg::DisableKillGameButton(false));
+                                                        std::thread::sleep(
+                                                            std::time::Duration::from_secs(3)
+                                                        );
+                                                        try_send!(sender, AppMsg::DisableKillGameButton(false));
                                                     }
                                                 ));
 
                                                 let result = std::process::Command::new("pkill")
-                                                    .arg("-f") // full text search
-                                                    .arg("-i") // case-insensitive
+                                                    .arg("-f")
+                                                    .arg("-i")
                                                     .arg("ZenlessZoneZero")
                                                     .spawn();
 
@@ -551,68 +581,17 @@ impl SimpleComponent for App {
                                                         description: Some(err.to_string())
                                                     });
                                                 }
-
-                                                // Old warning message which I don't really understand now:
-                                                //
-                                                // Doesn't work on all the systems
-                                                // e.g. won't work if you didn't install wine system-wide
-                                                // there's some reasons for it
-                                                //
-                                                // UPD: I've tried this, and the problem is that it's completely pointless
-                                                //      For whatever reason it just doesn't work
-
-                                                // match Config::get() {
-                                                //     Ok(config) => {
-                                                //         match config.get_selected_wine() {
-                                                //             Ok(Some(version)) => {
-                                                //                 let result = version
-                                                //                     .to_wine(&config.components.path, Some(&config.game.wine.builds.join(&version.name)))
-                                                //                     .with_prefix(config.get_wine_prefix_path())
-                                                //                     .stop_processes(true);
-
-                                                //                 dbg!(String::from_utf8_lossy(&result.as_ref().ok().unwrap().stdout));
-                                                //                 dbg!(String::from_utf8_lossy(&result.as_ref().ok().unwrap().stderr));
-
-                                                //                 if let Err(err) = result {
-                                                //                     sender.input(AppMsg::Toast {
-                                                //                         title: tr!("kill-game-process-failed"),
-                                                //                         description: Some(err.to_string())
-                                                //                     });
-                                                //                 }
-                                                //             }
-
-                                                //             Ok(None) => {
-                                                //                 sender.input(AppMsg::Toast {
-                                                //                     title: tr!("failed-get-selected-wine"),
-                                                //                     description: None
-                                                //                 });
-                                                //             }
-
-                                                //             Err(err) => {
-                                                //                 sender.input(AppMsg::Toast {
-                                                //                     title: tr!("failed-get-selected-wine"),
-                                                //                     description: Some(err.to_string())
-                                                //                 });
-                                                //             }
-                                                //         }
-                                                //     }
-
-                                                //     Err(err) => {
-                                                //         sender.input(AppMsg::Toast {
-                                                //             title: tr!("config-file-opening-error"),
-                                                //             description: Some(err.to_string())
-                                                //         });
-                                                //     }
-                                                // }
                                             }
                                         }
                                     },
 
+                                    // ── Import game button ──────────────────
                                     adw::Bin {
                                         set_css_classes: &["background", "round-bin"],
 
                                         #[watch]
-                                        set_visible: matches!(model.state.as_ref(),
+                                        set_visible: matches!(
+                                            model.state.as_ref(),
                                             Some(LauncherState::GameNotInstalled(_))
                                         ) && !model.kill_game_button,
 
@@ -632,6 +611,7 @@ impl SimpleComponent for App {
                                         }
                                     },
 
+                                    // ── Preferences button ──────────────────
                                     adw::Bin {
                                         set_css_classes: &["background", "round-bin"],
 
@@ -640,7 +620,6 @@ impl SimpleComponent for App {
                                             set_sensitive: !model.disabled_buttons,
 
                                             set_width_request: 44,
-
                                             add_css_class: "circular",
                                             set_icon_name: "emblem-system-symbolic",
 
@@ -672,7 +651,7 @@ impl SimpleComponent for App {
     fn init(
         _init: Self::Init,
         root: Self::Root,
-        sender: ComponentSender<Self>
+        sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         tracing::info!("Initializing main window");
 
@@ -682,7 +661,7 @@ impl SimpleComponent for App {
                     caption: None,
                     display_progress: true,
                     display_fraction: true,
-                    visible: true
+                    visible: true,
                 })
                 .detach(),
 
@@ -697,7 +676,7 @@ impl SimpleComponent for App {
             downloading: false,
             disabled_buttons: false,
             kill_game_button: false,
-            disabled_kill_game_button: false
+            disabled_kill_game_button: false,
         };
 
         model.progress_bar.widget().set_halign(gtk::Align::Center);
@@ -707,11 +686,11 @@ impl SimpleComponent for App {
 
         let widgets = view_output!();
 
-        // drag-and-drop onto the import button
+        // ── Drag-and-drop onto the import button ────────────────────────────
         {
             let drop_target = gtk::DropTarget::new(
                 gtk::gdk::FileList::static_type(),
-                gtk::gdk::DragAction::COPY
+                gtk::gdk::DragAction::COPY,
             );
             drop_target.connect_drop(clone!(
                 #[strong]
@@ -752,8 +731,6 @@ impl SimpleComponent for App {
 
         let mut group = RelmActionGroup::<WindowActionGroup>::new();
 
-        // TODO: reduce code somehow
-
         group.add_action::<LauncherFolder>(RelmAction::new_stateless(clone!(
             #[strong]
             sender,
@@ -763,7 +740,6 @@ impl SimpleComponent for App {
                         title: tr!("launcher-folder-opening-error"),
                         description: Some(err.to_string())
                     });
-
                     tracing::error!("Failed to open launcher folder: {err}");
                 }
             }
@@ -783,7 +759,7 @@ impl SimpleComponent for App {
                         .game
                         .path
                         .for_edition(CONFIG.launcher.edition)
-                        .to_path_buf()
+                        .to_path_buf(),
                 };
 
                 if let Err(err) = open::that(path) {
@@ -791,7 +767,6 @@ impl SimpleComponent for App {
                         title: tr!("game-folder-opening-error"),
                         description: Some(err.to_string())
                     });
-
                     tracing::error!("Failed to open game folder: {err}");
                 }
             }
@@ -807,7 +782,6 @@ impl SimpleComponent for App {
                             title: tr!("config-file-opening-error"),
                             description: Some(err.to_string())
                         });
-
                         tracing::error!("Failed to open config file: {err}");
                     }
                 }
@@ -823,12 +797,13 @@ impl SimpleComponent for App {
                         title: tr!("debug-file-opening-error"),
                         description: Some(err.to_string())
                     });
-
                     tracing::error!("Failed to open debug file: {err}");
                 }
             }
         )));
 
+        // ── Signal Search URL ───────────────────────────────────────────────
+        // Spawns a thread; all sender calls inside are guarded with try_send!
         group.add_action::<SignalSearchUrl>(RelmAction::new_stateless(clone!(
             #[strong]
             sender,
@@ -846,7 +821,7 @@ impl SimpleComponent for App {
                             .join(config.launcher.edition.data_folder())
                             .join("webCaches");
 
-                        // Find newest cache folder
+                        // Find the newest versioned cache subdirectory.
                         let mut web_cache_id = None;
 
                         if let Ok(entries) = web_cache.read_dir() {
@@ -872,7 +847,6 @@ impl SimpleComponent for App {
                                 Ok(web_cache) => {
                                     let web_cache = String::from_utf8_lossy(&web_cache);
 
-                                    // https://public-operation.[ho-yo-ver-se].com/common/gacha_record/getGachaLog?......
                                     if let Some(url) = web_cache
                                         .split("1/0/")
                                         .filter(|line| {
@@ -886,17 +860,16 @@ impl SimpleComponent for App {
                                             tracing::error!(
                                                 "Failed to open Signal Search URL: {err}"
                                             );
-
-                                            sender.input(AppMsg::Toast {
+                                            try_send!(sender, AppMsg::Toast {
                                                 title: tr!("signal-search-url-opening-error"),
                                                 description: Some(err.to_string())
                                             });
                                         }
-                                    }
-                                    else {
-                                        tracing::error!("Couldn't find wishes URL: no url found");
-
-                                        sender.input(AppMsg::Toast {
+                                    } else {
+                                        tracing::error!(
+                                            "Couldn't find wishes URL: no url found"
+                                        );
+                                        try_send!(sender, AppMsg::Toast {
                                             title: tr!("signal-search-url-search-failed"),
                                             description: None
                                         });
@@ -907,20 +880,17 @@ impl SimpleComponent for App {
                                     tracing::error!(
                                         "Couldn't find wishes URL: failed to open cache file: {err}"
                                     );
-
-                                    sender.input(AppMsg::Toast {
+                                    try_send!(sender, AppMsg::Toast {
                                         title: tr!("signal-search-url-search-failed"),
                                         description: Some(err.to_string())
                                     });
                                 }
                             }
-                        }
-                        else {
+                        } else {
                             tracing::error!(
                                 "Couldn't find Signal Search URL: cache file doesn't exist"
                             );
-
-                            sender.input(AppMsg::Toast {
+                            try_send!(sender, AppMsg::Toast {
                                 title: tr!("signal-search-url-search-failed"),
                                 description: None
                             });
@@ -942,28 +912,29 @@ impl SimpleComponent for App {
 
         let download_picture =
             model.style == LauncherStyle::Classic && !KEEP_BACKGROUND_FILE.exists();
-        let download_video = model.use_video_background;
-        let background_index = model.background_index;
+        let download_video    = model.use_video_background;
+        let background_index  = model.background_index;
 
-        // Initialize some heavy tasks
+        // ── Heavy initialisation tasks (background thread) ──────────────────
+        // All sender.input() calls here run during startup, but we still use
+        // try_send! so that a very fast window close can't crash the process.
         std::thread::spawn(move || {
             tracing::info!("Initializing heavy tasks");
 
             let mut tasks = Vec::new();
 
-            // Download background picture if needed
-
+            // 1. Download background picture if needed
             if download_picture {
                 tasks.push(std::thread::spawn(clone!(
                     #[strong]
                     sender,
                     move || {
-                        if let Err(err) =
-                            crate::background::download_background(download_video, background_index)
-                        {
+                        if let Err(err) = crate::background::download_background(
+                            download_video,
+                            background_index,
+                        ) {
                             tracing::error!("Failed to download background picture: {err}");
-
-                            sender.input(AppMsg::Toast {
+                            try_send!(sender, AppMsg::Toast {
                                 title: tr!("background-downloading-failed"),
                                 description: Some(err.to_string())
                             });
@@ -972,8 +943,7 @@ impl SimpleComponent for App {
                 )));
             }
 
-            // Update components index
-
+            // 2. Update components index
             tasks.push(std::thread::spawn(clone!(
                 #[strong]
                 sender,
@@ -987,12 +957,11 @@ impl SimpleComponent for App {
                             for host in &CONFIG.components.servers {
                                 match components.sync(host) {
                                     Ok(changes) => {
-                                        sender.input(AppMsg::Toast {
+                                        try_send!(sender, AppMsg::Toast {
                                             title: tr!("components-index-updated"),
                                             description: if changes.is_empty() {
                                                 None
-                                            }
-                                            else {
+                                            } else {
                                                 Some(
                                                     changes
                                                         .into_iter()
@@ -1002,14 +971,12 @@ impl SimpleComponent for App {
                                                 )
                                             }
                                         });
-
                                         break;
                                     }
 
                                     Err(err) => {
                                         tracing::error!("Failed to sync components index");
-
-                                        sender.input(AppMsg::Toast {
+                                        try_send!(sender, AppMsg::Toast {
                                             title: tr!("components-index-sync-failed"),
                                             description: Some(err.to_string())
                                         });
@@ -1019,9 +986,10 @@ impl SimpleComponent for App {
                         }
 
                         Err(err) => {
-                            tracing::error!("Failed to verify that components index synced");
-
-                            sender.input(AppMsg::Toast {
+                            tracing::error!(
+                                "Failed to verify that components index synced"
+                            );
+                            try_send!(sender, AppMsg::Toast {
                                 title: tr!("components-index-verify-failed"),
                                 description: Some(err.to_string())
                             });
@@ -1030,68 +998,55 @@ impl SimpleComponent for App {
                 }
             )));
 
-            // Update initial game version status
-
+            // 3. Fetch initial game version diff
             tasks.push(std::thread::spawn(clone!(
                 #[strong]
                 sender,
                 move || {
-                    sender.input(AppMsg::SetGameDiff(match GAME.try_get_diff() {
+                    try_send!(sender, AppMsg::SetGameDiff(match GAME.try_get_diff() {
                         Ok(diff) => Some(diff),
                         Err(err) => {
                             tracing::error!("Failed to find game diff: {err}");
-
-                            sender.input(AppMsg::Toast {
+                            try_send!(sender, AppMsg::Toast {
                                 title: tr!("game-diff-finding-error"),
                                 description: Some(err.to_string())
                             });
-
                             None
                         }
                     }));
-
                     tracing::info!("Updated game version status");
                 }
             )));
 
-            // Await for tasks to finish execution
             for task in tasks {
-                task.join().expect("Failed to join task");
+                task.join().expect("Failed to join init task");
             }
 
-            // Update launcher state
-            sender.input(AppMsg::UpdateLauncherState {
+            try_send!(sender, AppMsg::UpdateLauncherState {
                 perform_on_download_needed: false,
                 show_status_page: true
             });
 
-            // Mark app as loaded
             crate::READY.store(true, Ordering::Relaxed);
-
             tracing::info!("App is ready");
         });
 
-        ComponentParts {
-            model,
-            widgets
-        }
+        ComponentParts { model, widgets }
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         tracing::debug!("Called main window event: {:?}", msg);
 
         match msg {
-            // TODO: make function from this message like with toast
             AppMsg::UpdateLauncherState {
                 perform_on_download_needed,
-                show_status_page
+                show_status_page,
             } => {
                 if show_status_page {
                     sender.input(AppMsg::SetLoadingStatus(Some(Some(tr!(
                         "loading-launcher-state"
                     )))));
-                }
-                else {
+                } else {
                     self.disabled_buttons = true;
                 }
 
@@ -1115,9 +1070,10 @@ impl SimpleComponent for App {
                     Ok(state) => Some(state),
                     Err(err) => {
                         tracing::error!("Failed to update launcher state: {err}");
-
-                        self.toast(tr!("launcher-state-updating-error"), Some(err.to_string()));
-
+                        self.toast(
+                            tr!("launcher-state-updating-error"),
+                            Some(err.to_string()),
+                        );
                         None
                     }
                 };
@@ -1126,8 +1082,7 @@ impl SimpleComponent for App {
 
                 if show_status_page {
                     sender.input(AppMsg::SetLoadingStatus(None));
-                }
-                else {
+                } else {
                     self.disabled_buttons = false;
                 }
 
@@ -1141,7 +1096,6 @@ impl SimpleComponent for App {
                         {
                             sender.input(AppMsg::PerformAction);
                         }
-
                         _ => ()
                     }
                 }
@@ -1156,39 +1110,15 @@ impl SimpleComponent for App {
                     .send(PreferencesAppMsg::SetGameDiff(diff));
             },
 
-            AppMsg::SetLauncherState(state) => {
-                self.state = state;
-            }
-
-            AppMsg::SetLoadingStatus(status) => {
-                self.loading = status;
-            }
-
-            AppMsg::SetLauncherStyle(style) => {
-                self.style = style;
-            }
-
-            AppMsg::SetVideoBackground(use_video) => self.use_video_background = use_video,
-
-            AppMsg::SetBackgroundIndex(background_index) => {
-                self.background_index = background_index
-            }
-
-            AppMsg::SetDownloading(state) => {
-                self.downloading = state;
-            }
-
-            AppMsg::DisableButtons(state) => {
-                self.disabled_buttons = state;
-            }
-
-            AppMsg::SetKillGameButton(state) => {
-                self.kill_game_button = state;
-            }
-
-            AppMsg::DisableKillGameButton(state) => {
-                self.disabled_kill_game_button = state;
-            }
+            AppMsg::SetLauncherState(state)        => { self.state = state; }
+            AppMsg::SetLoadingStatus(status)        => { self.loading = status; }
+            AppMsg::SetLauncherStyle(style)         => { self.style = style; }
+            AppMsg::SetVideoBackground(use_video)   => { self.use_video_background = use_video; }
+            AppMsg::SetBackgroundIndex(idx)         => { self.background_index = idx; }
+            AppMsg::SetDownloading(state)           => { self.downloading = state; }
+            AppMsg::DisableButtons(state)           => { self.disabled_buttons = state; }
+            AppMsg::SetKillGameButton(state)        => { self.kill_game_button = state; }
+            AppMsg::DisableKillGameButton(state)    => { self.disabled_kill_game_button = state; }
 
             AppMsg::OpenPreferences => unsafe {
                 PREFERENCES_WINDOW
@@ -1203,25 +1133,34 @@ impl SimpleComponent for App {
             }
 
             AppMsg::RemakePrefix => {
-                let config = Config::get().unwrap();
+                let config = match Config::get() {
+                    Ok(c) => c,
+                    Err(err) => {
+                        tracing::error!("Failed to read config: {err}");
+                        sender.input(AppMsg::Toast {
+                            title: tr!("config-load-failed"),
+                            description: Some(err.to_string()),
+                        });
+                        return;
+                    }
+                };
+
                 let prefix = config.game.wine.prefix.clone();
 
                 if prefix.exists() {
                     if let Err(err) = std::fs::remove_dir_all(&prefix) {
                         tracing::error!("Failed to remove wine prefix: {err}");
-
                         sender.input(AppMsg::Toast {
                             title: tr!("wine-prefix-update-failed"),
                             description: Some(err.to_string())
                         });
-
                         return;
                     }
                 }
 
                 sender.input(AppMsg::UpdateLauncherState {
                     perform_on_download_needed: false,
-                    show_status_page: true
+                    show_status_page: true,
                 });
             }
 
@@ -1231,7 +1170,9 @@ impl SimpleComponent for App {
                     sender,
                     async move {
                         if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
-                            sender.input(AppMsg::ImportGameFromPath(folder.path().to_path_buf()));
+                            sender.input(AppMsg::ImportGameFromPath(
+                                folder.path().to_path_buf()
+                            ));
                         }
                     }
                 ));
@@ -1245,23 +1186,31 @@ impl SimpleComponent for App {
                 ));
             }
 
+            // ── Pre-download update ─────────────────────────────────────────
+            // The spawned thread uses try_send! so a mid-download window close
+            // doesn't crash the process.
             #[allow(unused_must_use)]
             AppMsg::PredownloadUpdate => {
-                if let Some(LauncherState::PredownloadAvailable {
-                    mut game
-                }) = self.state.clone()
+                if let Some(LauncherState::PredownloadAvailable { mut game }) =
+                    self.state.clone()
                 {
-                    let tmp = Config::get()
-                        .unwrap()
-                        .launcher
-                        .temp
-                        .unwrap_or_else(std::env::temp_dir);
+                    let tmp = match Config::get() {
+                        Ok(c) => c.launcher.temp.unwrap_or_else(std::env::temp_dir),
+                        Err(err) => {
+                            tracing::error!("Failed to read config for predownload: {err}");
+                            sender.input(AppMsg::Toast {
+                                title: tr!("config-load-failed"),
+                                description: Some(err.to_string()),
+                            });
+                            return;
+                        }
+                    };
 
                     self.downloading = true;
 
                     let progress_bar_input = self.progress_bar.sender().clone();
 
-                    progress_bar_input
+                    let _ = progress_bar_input
                         .send(ProgressBarMsg::UpdateCaption(Some(tr!("downloading"))));
 
                     std::thread::spawn(move || {
@@ -1271,23 +1220,22 @@ impl SimpleComponent for App {
                                 #[strong]
                                 progress_bar_input,
                                 move |curr, total| {
-                                    progress_bar_input
+                                    let _ = progress_bar_input
                                         .send(ProgressBarMsg::UpdateProgress(curr, total));
                                 }
-                            )
+                            ),
                         );
 
                         if let Err(err) = result {
-                            sender.input(AppMsg::Toast {
+                            tracing::error!("Failed to predownload update: {err}");
+                            try_send!(sender, AppMsg::Toast {
                                 title: tr!("downloading-failed"),
                                 description: Some(err.to_string())
                             });
-
-                            tracing::error!("Failed to predownload update: {err}");
                         }
 
-                        sender.input(AppMsg::SetDownloading(false));
-                        sender.input(AppMsg::UpdateLauncherState {
+                        try_send!(sender, AppMsg::SetDownloading(false));
+                        try_send!(sender, AppMsg::UpdateLauncherState {
                             perform_on_download_needed: false,
                             show_status_page: true
                         });
@@ -1297,43 +1245,48 @@ impl SimpleComponent for App {
 
             AppMsg::PerformAction => unsafe {
                 match self.state.as_ref().unwrap_unchecked() {
-                    LauncherState::PredownloadAvailable {
-                        ..
-                    }
+                    LauncherState::PredownloadAvailable { .. }
                     | LauncherState::Launch => launch::launch(sender),
 
-                    LauncherState::FolderMigrationRequired {
-                        from,
-                        to,
-                        cleanup_folder
-                    } => migrate_folder::migrate_folder(
-                        sender,
-                        from.to_owned(),
-                        to.to_owned(),
-                        cleanup_folder.to_owned()
-                    ),
+                    LauncherState::FolderMigrationRequired { from, to, cleanup_folder } => {
+                        migrate_folder::migrate_folder(
+                            sender,
+                            from.to_owned(),
+                            to.to_owned(),
+                            cleanup_folder.to_owned(),
+                        )
+                    }
 
                     LauncherState::TelemetryNotDisabled => {
                         disable_telemetry::disable_telemetry(sender)
                     }
 
                     LauncherState::WineNotInstalled => {
-                        download_wine::download_wine(sender, self.progress_bar.sender().to_owned())
+                        download_wine::download_wine(
+                            sender,
+                            self.progress_bar.sender().to_owned(),
+                        )
                     }
+
                     LauncherState::PrefixNotExists => create_prefix::create_prefix(sender),
 
                     LauncherState::DxvkNotInstalled => {
-                        install_dxvk::install_dxvk(sender, self.progress_bar.sender().to_owned())
+                        install_dxvk::install_dxvk(
+                            sender,
+                            self.progress_bar.sender().to_owned(),
+                        )
                     }
 
                     LauncherState::GameUpdateAvailable(diff)
                     | LauncherState::GameNotInstalled(diff)
                     | LauncherState::VoiceUpdateAvailable(diff)
-                    | LauncherState::VoiceNotInstalled(diff) => download_diff::download_diff(
-                        sender,
-                        self.progress_bar.sender().to_owned(),
-                        diff.to_owned()
-                    ),
+                    | LauncherState::VoiceNotInstalled(diff) => {
+                        download_diff::download_diff(
+                            sender,
+                            self.progress_bar.sender().to_owned(),
+                            diff.to_owned(),
+                        )
+                    }
 
                     LauncherState::GameOutdated(_) | LauncherState::VoiceOutdated(_) => ()
                 }
@@ -1349,10 +1302,7 @@ impl SimpleComponent for App {
 
             AppMsg::SuggestTimeoutFix => self.suggest_timeout_fix(),
 
-            AppMsg::Toast {
-                title,
-                description
-            } => self.toast(title, description)
+            AppMsg::Toast { title, description } => self.toast(title, description),
         }
     }
 }
@@ -1360,26 +1310,23 @@ impl SimpleComponent for App {
 impl App {
     pub fn suggest_timeout_fix(&self) {
         #[allow(static_mut_refs)]
-        let Some(window) = (unsafe { MAIN_WINDOW.as_ref() })
-        else {
+        let Some(window) = (unsafe { MAIN_WINDOW.as_ref() }) else {
             return;
         };
 
         let dialog = adw::MessageDialog::new(
             Some(window),
             Some(&tr!("timeout-fix-detected")),
-            Some(&tr!("timeout-fix-detected-description"))
+            Some(&tr!("timeout-fix-detected-description")),
         );
 
         dialog.add_response("ignore", &tr!("close"));
         dialog.add_response("enable", &tr!("enable"));
-
         dialog.set_response_appearance("enable", adw::ResponseAppearance::Suggested);
 
         dialog.connect_response(Some("enable"), |_, _| {
             if let Ok(mut config) = Config::get() {
                 config.game.wine.timeout_fix = true;
-
                 Config::update(config);
             }
 
@@ -1396,7 +1343,6 @@ impl App {
 
     pub fn toast<T: AsRef<str>>(&mut self, title: T, description: Option<T>) {
         let toast = adw::Toast::new(title.as_ref());
-
         toast.set_timeout(4);
 
         if let Some(description) = description {
@@ -1405,12 +1351,11 @@ impl App {
             let dialog = adw::MessageDialog::new(
                 Some(unsafe { MAIN_WINDOW.as_ref().unwrap_unchecked() }),
                 Some(title.as_ref()),
-                Some(description.as_ref())
+                Some(description.as_ref()),
             );
 
             dialog.add_response("close", &tr!("close", { "form" = "noun" }));
             dialog.add_response("save", &tr!("save"));
-
             dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
 
             dialog.connect_response(Some("save"), |_, _| {
